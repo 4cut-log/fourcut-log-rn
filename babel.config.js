@@ -18,7 +18,7 @@ module.exports = {
         ],
         alias: {
           '@': './src',
-          '@screens': './src/screens/index',
+          '@screens': './src/screens',
           '@components': './src/components/index',
           '@constants': './src/constants',
           '@hooks': './src/hooks',

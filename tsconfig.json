@@ -5,7 +5,8 @@
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"],
-      "@screens": ["screens/index"],
+      "@screens": ["screens"],
+      "@screens/*": ["screens/*"],
       "@components": ["components/index"],
       "@constants/*": ["constants/*"],
       "@hooks/*": ["hooks/*"],
