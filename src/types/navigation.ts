@@ -8,6 +8,8 @@ export type RootStackParamList = {
   Auth: undefined;
   BottomTab: NavigatorScreenParams<RootBottomTabParamList>;
   AddLog: undefined;
+  FlogDetail: {flogId: string};
+  EditLog: {flogId: string};
 };
 
 // ────────────────────────────────
@@ -39,7 +41,9 @@ export type CalendarStackParamList = {
 // ────────────────────────────────
 export type GalleryStackParamList = {
   GalleryMain: undefined;
-  // 예: PhotoDetail: { photoId: number };
+  GalleryRecent: undefined;
+  GalleryByTag: undefined;
+  GalleryTagDetail: {tagName: string; color: string};
 };
 
 // ────────────────────────────────
@@ -47,5 +51,5 @@ export type GalleryStackParamList = {
 // ────────────────────────────────
 export type MoreStackParamList = {
   MoreMain: undefined;
-  // 예: ProfileEdit: undefined;
+  EditProfile: undefined;
 };

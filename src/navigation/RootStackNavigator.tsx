@@ -5,6 +5,8 @@ import SplashScreen from '@screens/Splash/SplashScreen';
 import AuthStack from '@screens/Auth/AuthStack';
 import BottomTabNavigator from './BottomTabNavigator';
 import AddLogScreen from '@screens/AddLog/AddLogScreen';
+import FlogDetailScreen from '@screens/FlogDetail/FlogDetailScreen';
+import EditLogScreen from '@screens/EditLog/EditLogScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -23,6 +25,16 @@ export default function RootStackNavigator() {
       <Stack.Screen
         name="AddLog"
         component={AddLogScreen}
+        options={{animation: 'slide_from_right'}}
+      />
+      <Stack.Screen
+        name="FlogDetail"
+        component={FlogDetailScreen}
+        options={{animation: 'slide_from_right'}}
+      />
+      <Stack.Screen
+        name="EditLog"
+        component={EditLogScreen}
         options={{animation: 'slide_from_right'}}
       />
     </Stack.Navigator>

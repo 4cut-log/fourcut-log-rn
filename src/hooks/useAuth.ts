@@ -50,6 +50,7 @@ const useAuth = () => {
 
       const accessToken = params['accessToken'];
       const refreshToken = params['refreshToken'];
+      const nickname = params['nickname'];
 
       if (!accessToken || !refreshToken) {
         Alert.alert('로그인 실패', '토큰을 받지 못했습니다.');
@@ -57,6 +58,9 @@ const useAuth = () => {
       }
 
       saveTokens(accessToken, refreshToken);
+      if (nickname) {
+        mmkvStorage.setString(KEY.NICKNAME, nickname);
+      }
       return true;
     },
     [saveTokens],

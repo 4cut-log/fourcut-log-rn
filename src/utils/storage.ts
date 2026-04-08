@@ -5,6 +5,7 @@ const storage = new MMKV();
 const KEY = {
   ACCESS_TOKEN: 'accessToken',
   REFRESH_TOKEN: 'refreshToken',
+  NICKNAME: 'nickname',
 };
 
 const mmkvStorage = {

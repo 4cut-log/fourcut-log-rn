@@ -1,6 +1,8 @@
 import axios, {AxiosError} from 'axios';
+import {Alert} from 'react-native';
 import Config from 'react-native-config';
 import {mmkvStorage, KEY} from '@utils/storage';
+import {navigateToAuth} from '@/navigation/navigationRef';
 
 const instance = axios.create({
   baseURL: Config.BASE_URL,
@@ -36,9 +38,12 @@ instance.interceptors.response.use(
       }
 
       try {
-        // Refresh Token으로 새 토큰 발급
-        const res = await instance.post('/auth/reissue', null, {
-          headers: {'Refresh-Token': refreshToken},
+        // Refresh Token으로 새 토큰 발급 (인터셉터 없는 순수 axios 사용)
+        const res = await axios.post(`${Config.BASE_URL}/auth/reissue`, null, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Refresh-Token': refreshToken,
+          },
         });
 
         const {accessToken: newAccessToken, refreshToken: newRefreshToken} =
@@ -52,9 +57,10 @@ instance.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return instance(originalRequest);
       } catch {
-        // Refresh Token도 만료 → 토큰 삭제 (로그인 화면으로 이동은 각 화면에서 처리)
         mmkvStorage.delete(KEY.ACCESS_TOKEN);
         mmkvStorage.delete(KEY.REFRESH_TOKEN);
+        navigateToAuth();
+        Alert.alert('세션 만료', '다시 로그인해주세요.');
         return Promise.reject(error);
       }
     }

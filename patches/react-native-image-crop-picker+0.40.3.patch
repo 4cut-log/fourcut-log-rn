@@ -1,0 +1,57 @@
+diff --git a/node_modules/react-native-image-crop-picker/ios/src/ImageCropPicker.m b/node_modules/react-native-image-crop-picker/ios/src/ImageCropPicker.m
+index 9f20973..2271e21 100644
+--- a/node_modules/react-native-image-crop-picker/ios/src/ImageCropPicker.m
++++ b/node_modules/react-native-image-crop-picker/ios/src/ImageCropPicker.m
+@@ -916,7 +916,51 @@ - (void)cropImage:(UIImage *)image {
+             cropVC.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
+         }
+         
+-        [[self getRootVC] presentViewController:cropVC animated:FALSE completion:nil];
++        NSDictionary *cropRectOption = [self.options objectForKey:@"cropRect"];
++        NSString *subtitleText = [self.options objectForKey:@"cropperSubtitleTitle"];
++        __weak TOCropViewController *weakCropVC = cropVC;
++        [[self getRootVC] presentViewController:cropVC animated:FALSE completion:^{
++            if (cropRectOption && ![cropRectOption isKindOfClass:[NSNull class]]) {
++                CGFloat x = [[cropRectOption objectForKey:@"x"] floatValue];
++                CGFloat y = [[cropRectOption objectForKey:@"y"] floatValue];
++                CGFloat w = [[cropRectOption objectForKey:@"width"] floatValue];
++                CGFloat h = [[cropRectOption objectForKey:@"height"] floatValue];
++                weakCropVC.imageCropFrame = CGRectMake(x, y, w, h);
++            }
++            if (subtitleText && ![subtitleText isKindOfClass:[NSNull class]] && weakCropVC.titleLabel) {
++                UILabel *originalTitleLabel = weakCropVC.titleLabel;
++                CGFloat extraPadding = 12.0;
++                CGFloat superWidth = originalTitleLabel.superview.bounds.size.width;
++
++                // 원본 titleLabel을 숨기고 새 label을 원하는 위치에 직접 추가
++                NSString *titleText = originalTitleLabel.text;
++                originalTitleLabel.hidden = YES;
++
++                UILabel *newTitleLabel = [[UILabel alloc] init];
++                newTitleLabel.text = titleText;
++                newTitleLabel.font = originalTitleLabel.font;
++                newTitleLabel.textColor = originalTitleLabel.textColor;
++                newTitleLabel.textAlignment = NSTextAlignmentCenter;
++                [newTitleLabel sizeToFit];
++                CGFloat newTitleY = CGRectGetMinY(originalTitleLabel.frame) + extraPadding;
++                CGFloat newTitleX = (superWidth - newTitleLabel.frame.size.width) / 2;
++                newTitleLabel.frame = CGRectMake(newTitleX, newTitleY, newTitleLabel.frame.size.width, newTitleLabel.frame.size.height);
++                [originalTitleLabel.superview addSubview:newTitleLabel];
++
++                UILabel *subtitleLabel = [[UILabel alloc] init];
++                subtitleLabel.text = subtitleText;
++                subtitleLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.65];
++                subtitleLabel.font = [UIFont systemFontOfSize:12.0];
++                subtitleLabel.textAlignment = NSTextAlignmentCenter;
++                subtitleLabel.numberOfLines = 0;
++                [subtitleLabel sizeToFit];
++                CGFloat subtitleWidth = MIN(subtitleLabel.frame.size.width, superWidth - 32);
++                CGFloat subtitleX = (superWidth - subtitleWidth) / 2;
++                CGFloat subtitleY = CGRectGetMaxY(newTitleLabel.frame) + 4;
++                subtitleLabel.frame = CGRectMake(subtitleX, subtitleY, subtitleWidth, subtitleLabel.frame.size.height);
++                [originalTitleLabel.superview addSubview:subtitleLabel];
++            }
++        }];
+     });
+ }
+ #pragma mark - TOCropViewController Delegate

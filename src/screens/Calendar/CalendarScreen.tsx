@@ -1,22 +1,26 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Calendar, DateData} from 'react-native-calendars';
-import {useQuery} from '@tanstack/react-query';
-import {getCalendarPhotos} from '@api/calendar';
-import {DayCell} from '@components';
+import {_useFetch} from '@hooks/useFetch';
+import {DayCell, DayBottomSheet} from '@components';
 import MonthPickerModal from '@/components/Calendar/MonthPickerModal';
-import {PhotosByDate} from '@type/calendar';
+import {PhotosByDate, CalendarPhoto, CalendarDayData} from '@type/calendar';
 import type {DayState} from 'react-native-calendars/src/types';
 import {useNavigation} from '@react-navigation/native';
 import type {NavigationProp} from '@react-navigation/native';
 import {RootStackParamList} from '@type/navigation';
+import {pinFlog} from '@api/flog';
+import {useQueryClient} from '@tanstack/react-query';
+import {TagItem} from '@api/tags';
+import TagFilterModal from '@/components/Calendar/TagFilterModal';
 
 const toYearMonth = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -26,20 +30,49 @@ const TODAY_MONTH = TODAY.substring(0, 7);
 
 export default function CalendarScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(toYearMonth(new Date()));
   const [isPickerVisible, setIsPickerVisible] = useState(false);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
+  const [bottomSheet, setBottomSheet] = useState<{
+    visible: boolean;
+    date: string;
+    photos: CalendarPhoto[];
+  }>({visible: false, date: '', photos: []});
 
-  const {data: photosByDate = {}, isLoading} = useQuery<PhotosByDate>({
-    queryKey: ['calendar', currentMonth],
-    queryFn: async () => {
-      const res = await getCalendarPhotos(currentMonth);
-      const result: PhotosByDate = {};
-      res.data.data.forEach(({date, photos}) => {
-        result[date] = photos;
-      });
-      return result;
-    },
+  const {data: tagsRes} = _useFetch<{status: number; data: TagItem[]; message: string}>(
+    '/tags',
+    ['tags'],
+    undefined,
+    {retry: false},
+  );
+  const tags: TagItem[] = tagsRes?.data ?? [];
+
+  const calendarParams = useMemo(
+    () => ({
+      yearMonth: currentMonth,
+      ...(selectedTagNames.length > 0 ? {tagNames: selectedTagNames.join(',')} : {}),
+    }),
+    [currentMonth, selectedTagNames],
+  );
+
+  const {data: calendarRes, isLoading} = _useFetch<{
+    status: number;
+    data: CalendarDayData[];
+    message: string;
+  }>('/calendar', ['calendar', currentMonth, selectedTagNames], calendarParams, {
+    retry: false,
   });
+
+  const photosByDate: PhotosByDate = useMemo(() => {
+    if (!calendarRes?.data) return {};
+    const result: PhotosByDate = {};
+    calendarRes.data.forEach(({date, photos}) => {
+      result[date] = photos;
+    });
+    return result;
+  }, [calendarRes]);
 
   const handleMonthChange = useCallback((month: DateData) => {
     setCurrentMonth(`${month.year}-${String(month.month).padStart(2, '0')}`);
@@ -60,16 +93,21 @@ export default function CalendarScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton} hitSlop={8}>
+        <TouchableOpacity
+          style={styles.menuButton}
+          hitSlop={8}
+          onPress={() => setIsFilterVisible(true)}>
           <Text style={styles.menuIcon}>☰</Text>
+          {selectedTagNames.length > 0 && <View style={styles.filterDot} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.monthPicker}
           hitSlop={8}
           onPress={() => setIsPickerVisible(true)}>
           <Text style={styles.monthText}>
-            {yearStr}.{parseInt(monthStr, 10)} ∨
+            {yearStr}.{parseInt(monthStr, 10)}
           </Text>
+          <Image source={require('@images/calendar/downArrowIcon.png')} style={styles.downArrowIcon} />
         </TouchableOpacity>
         <View style={styles.headerRight} />
       </View>
@@ -77,39 +115,47 @@ export default function CalendarScreen() {
       {/* 캘린더 */}
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color="#F5A623" />
-      ) : (
-        <Calendar
-          key={currentMonth}
-          current={`${currentMonth}-01`}
-          firstDay={0}
-          hideArrows
-          renderHeader={() => null}
-          disableMonthChange
-          onMonthChange={handleMonthChange}
-          dayComponent={({date, state}) => {
-            if (!date) {
-              return null;
-            }
-            const photos = photosByDate[date.dateString] ?? [];
-            const dow = new Date(`${date.dateString}T00:00:00`).getDay();
-            return (
-              <DayCell
-                date={date}
-                state={state as DayState | undefined}
-                photos={photos}
-                dayOfWeek={dow}
-                onPress={dateString => console.log('날짜 선택:', dateString)}
-              />
-            );
-          }}
-          style={styles.calendar}
-          theme={{
-            textDayHeaderFontSize: 13,
-            textSectionTitleColor: '#666',
-            calendarBackground: '#fff',
-          }}
-        />
-      )}
+      ) : null}
+      <Calendar
+        key={currentMonth}
+        current={`${currentMonth}-01`}
+        firstDay={0}
+        hideArrows
+        renderHeader={() => null}
+        disableMonthChange
+        onMonthChange={handleMonthChange}
+        dayComponent={({date, state}) => {
+          if (!date) {
+            return null;
+          }
+          const photos = photosByDate[date.dateString] ?? [];
+          const dow = new Date(`${date.dateString}T00:00:00`).getDay();
+          return (
+            <DayCell
+              date={date}
+              state={state as DayState | undefined}
+              photos={photos}
+              dayOfWeek={dow}
+              onPress={(dateString, photos) => {
+                if (photos.length === 0) return;
+                if (photos.length === 1) {
+                  navigation.navigate('FlogDetail', {
+                    flogId: String(photos[0].id),
+                  });
+                } else {
+                  setBottomSheet({visible: true, date: dateString, photos});
+                }
+              }}
+            />
+          );
+        }}
+        style={styles.calendar}
+        theme={{
+          textDayHeaderFontSize: 13,
+          textSectionTitleColor: '#666',
+          calendarBackground: '#fff',
+        }}
+      />
 
       {/* 오늘로 이동 버튼 (현재 월이 아닐 때만) */}
       {!isCurrentMonth && (
@@ -124,6 +170,44 @@ export default function CalendarScreen() {
         onPress={() => navigation.navigate('AddLog')}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      {/* 날짜 바텀시트 (기록 여러 개일 때) */}
+      <DayBottomSheet
+        visible={bottomSheet.visible}
+        date={bottomSheet.date}
+        photos={bottomSheet.photos}
+        onSelect={flogId => {
+          setBottomSheet(prev => ({...prev, visible: false}));
+          navigation.navigate('FlogDetail', {flogId: String(flogId)});
+        }}
+        onPin={async flogId => {
+          await pinFlog(String(flogId));
+          // 캘린더 데이터 갱신 + 바텀시트 내 pinned 상태 업데이트
+          queryClient.invalidateQueries({queryKey: ['calendar', currentMonth]});
+          setBottomSheet(prev => ({
+            ...prev,
+            photos: prev.photos.map(p => ({...p, pinned: p.id === flogId})),
+          }));
+        }}
+        onClose={() => setBottomSheet(prev => ({...prev, visible: false}))}
+      />
+
+      {/* 태그 필터 모달 */}
+      <TagFilterModal
+        visible={isFilterVisible}
+        tags={tags}
+        selectedTagNames={selectedTagNames}
+        onToggle={tagName =>
+          setSelectedTagNames(prev =>
+            prev.includes(tagName)
+              ? prev.filter(t => t !== tagName)
+              : [...prev, tagName],
+          )
+        }
+        onSelectAll={() => setSelectedTagNames(tags.map(t => t.tagName))}
+        onClearAll={() => setSelectedTagNames([])}
+        onClose={() => setIsFilterVisible(false)}
+      />
 
       {/* 월 선택 모달 */}
       <MonthPickerModal
@@ -151,18 +235,35 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 4,
   },
+  filterDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#F5A623',
+  },
   menuIcon: {
-    fontSize: 20,
+    fontSize: 22,
     color: '#1a1a1a',
   },
   monthPicker: {
     marginLeft: 8,
     padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   monthText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
     color: '#1a1a1a',
+  },
+  downArrowIcon: {
+    width: 16,
+    height: 16,
+    resizeMode: 'contain',
   },
   headerRight: {
     flex: 1,
@@ -171,7 +272,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   loader: {
-    flex: 1,
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '50%',
   },
   todayButton: {
     position: 'absolute',
@@ -190,7 +293,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   todayButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#1a1a1a',
     fontWeight: '500',
   },
@@ -211,7 +314,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: {
-    fontSize: 28,
+    fontSize: 30,
     color: '#fff',
     lineHeight: 32,
     fontWeight: '300',
